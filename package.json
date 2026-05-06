@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
+    "@types/pg": "^8.20.0",
     "next": "14.2.35",
     "openai": "^6.36.0",
+    "pg": "^8.20.0",
     "react": "^18",
     "react-dom": "^18",
     "resend": "^6.12.3",
