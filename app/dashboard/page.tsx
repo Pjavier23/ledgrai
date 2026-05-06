@@ -7,7 +7,8 @@ interface Client {
   id: string
   business_name: string
   industry: string
-  status: string
+  subscription_status?: string
+  status?: string
   monthly_fee: number
   email?: string
   created_at: string
@@ -18,14 +19,25 @@ const INDUSTRIES = ['Cleaning', 'Construction', 'HVAC', 'Flooring', 'Landscaping
 export default function DashboardPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
+  const [needsSetup, setNeedsSetup] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ business_name: '', industry: 'Cleaning', email: '' })
   const [saving, setSaving] = useState(false)
+  const [addError, setAddError] = useState('')
 
   const fetchClients = async () => {
-    const res = await fetch('/api/clients')
-    const data = await res.json()
-    setClients(data.clients || [])
+    try {
+      const res = await fetch('/api/clients')
+      const data = await res.json()
+      if (data.needsSetup) {
+        setNeedsSetup(true)
+        setLoading(false)
+        return
+      }
+      setClients(data.clients || [])
+    } catch {
+      setNeedsSetup(true)
+    }
     setLoading(false)
   }
 
@@ -34,25 +46,74 @@ export default function DashboardPage() {
   const addClient = async () => {
     if (!form.business_name.trim()) return
     setSaving(true)
-    await fetch('/api/clients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, monthly_fee: 100, status: 'active' }),
-    })
+    setAddError('')
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, monthly_fee: 100, status: 'active' }),
+      })
+      const data = await res.json()
+      if (data.needsSetup || data.error) {
+        setAddError(data.error || 'Database not set up. Visit /setup to initialize.')
+        setSaving(false)
+        return
+      }
+    } catch (e: any) {
+      setAddError(e.message)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     setShowModal(false)
     setForm({ business_name: '', industry: 'Cleaning', email: '' })
     fetchClients()
   }
 
-  const mrr = clients.filter(c => c.status === 'active').length * 100
-  const activeCount = clients.filter(c => c.status === 'active').length
+  const getStatus = (c: Client) => c.subscription_status || c.status || 'active'
+
+  const mrr = clients.filter(c => getStatus(c) === 'active').length * 100
+  const activeCount = clients.filter(c => getStatus(c) === 'active').length
 
   const statusColor = (s: string) => ({
     active: '#00b4d8',
     inactive: '#6b7280',
     pending: '#f59e0b',
+    trial: '#a855f7',
   }[s] || '#6b7280')
+
+  if (needsSetup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0a' }}>
+        <div className="max-w-lg w-full mx-4">
+          <div className="card p-8 text-center">
+            <div className="text-5xl mb-4">🛠️</div>
+            <h2 className="text-2xl font-bold text-white mb-2">Setup Required</h2>
+            <p className="text-gray-400 mb-6">
+              The LedgrAI database tables haven't been created yet. You'll need to run the setup SQL in your Supabase dashboard.
+            </p>
+            <Link
+              href="/setup"
+              className="inline-block font-semibold px-6 py-3 rounded-lg text-black"
+              style={{ background: '#00b4d8' }}
+            >
+              Go to Setup Page →
+            </Link>
+            <div className="mt-4">
+              <a
+                href="https://supabase.com/dashboard/project/tkljofxcndnwqyqrtrnx/sql/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-gray-400 hover:text-white underline"
+              >
+                Open Supabase SQL Editor
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0a0a' }}>
@@ -68,6 +129,7 @@ export default function DashboardPage() {
             <span className="text-xl font-bold text-white">LedgrAI</span>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/setup" className="text-gray-500 text-xs hover:text-gray-300">Setup</Link>
             <span className="text-gray-400 text-sm">Pedro Javier</span>
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-black" style={{ background: '#00b4d8' }}>P</div>
           </div>
@@ -109,7 +171,14 @@ export default function DashboardPage() {
         ) : clients.length === 0 ? (
           <div className="card p-12 text-center">
             <div className="text-4xl mb-3">🏢</div>
-            <div className="text-gray-400">No clients yet. Add your first client to get started.</div>
+            <div className="text-gray-400 mb-4">No clients yet. Add your first client to get started.</div>
+            <button
+              onClick={() => setShowModal(true)}
+              className="font-semibold px-4 py-2 rounded-lg text-sm"
+              style={{ background: '#00b4d8', color: '#000' }}
+            >
+              + Add First Client
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-4">
@@ -120,8 +189,8 @@ export default function DashboardPage() {
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold text-black" style={{ background: '#00b4d8' }}>
                       {client.business_name[0]}
                     </div>
-                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: statusColor(client.status) + '22', color: statusColor(client.status) }}>
-                      {client.status}
+                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: statusColor(getStatus(client)) + '22', color: statusColor(getStatus(client)) }}>
+                      {getStatus(client)}
                     </span>
                   </div>
                   <div className="font-semibold text-white mb-1">{client.business_name}</div>
@@ -176,9 +245,14 @@ export default function DashboardPage() {
                   placeholder="client@business.com"
                 />
               </div>
+              {addError && (
+                <div className="text-red-400 text-sm p-3 rounded-lg" style={{ background: '#ef444422' }}>
+                  ⚠️ {addError}
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1" style={{ border: '1px solid #333', color: '#fff', padding: '10px', borderRadius: '8px', background: 'transparent' }}>
+              <button onClick={() => { setShowModal(false); setAddError('') }} className="btn-secondary flex-1" style={{ border: '1px solid #333', color: '#fff', padding: '10px', borderRadius: '8px', background: 'transparent' }}>
                 Cancel
               </button>
               <button onClick={addClient} disabled={saving} className="flex-1 font-semibold py-2 rounded-lg" style={{ background: '#00b4d8', color: '#000' }}>
