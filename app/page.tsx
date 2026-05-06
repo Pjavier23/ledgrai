@@ -1,9 +1,7 @@
-'use client'
-
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LandingPage() {
-  const router = useRouter()
+  
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center" style={{ background: '#0a0a0a' }}>
@@ -28,13 +26,13 @@ export default function LandingPage() {
         </p>
 
         {/* CTA */}
-        <button
-          onClick={() => router.push('/dashboard')}
+        <Link href="/dashboard"
+          
           className="btn-primary text-lg px-8 py-3 rounded-xl"
           style={{ background: '#00b4d8', color: '#000', fontWeight: 700, fontSize: '1.1rem' }}
         >
           Sign In →
-        </button>
+        </Link>
 
         {/* Features */}
         <div className="grid grid-cols-3 gap-4 mt-16">
