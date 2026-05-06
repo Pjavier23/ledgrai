@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const { error: bucketCheckError } = await supabase.storage.getBucket('bk-documents')
     if (bucketCheckError) {
       // Try to create it
-      await supabase.storage.createBucket('bk-documents', { public: false })
+      await supabase.storage.createBucket('bk-documents', { public: true })
     }
 
     // Upload to Supabase Storage
@@ -67,9 +67,10 @@ export async function POST(req: NextRequest) {
       .from('bk_documents')
       .insert({
         client_id: clientId,
-        file_name: file.name,
         file_url: fileUrl,
-        extracted: false,
+        doc_type: file.type.startsWith('image/') ? 'receipt' : 'document',
+        ai_processed: false,
+        description: file.name,
       })
       .select()
       .single()
